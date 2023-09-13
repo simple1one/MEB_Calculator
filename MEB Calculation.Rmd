@@ -1,0 +1,257 @@
+---
+title: "MEB Calculation"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r echo=FALSE}
+
+
+library(shiny)
+library(readxl)
+library(writexl)
+library(dplyr)
+
+
+
+ui <- fluidPage(
+  titlePanel("MEB Calculation Tool"),
+  
+
+  fileInput("dosyaYukleme1", "TUIK Indexes"),
+  
+
+  fileInput("dosyaYukleme2", "Last MEB Calculation"),
+  
+  fileInput("dosyaYukleme3", "Monthly Multiplier"),
+  
+  actionButton("islemButonu", "Calculate"),
+  downloadButton("MEB_by_Item", "Download MEB Items"),
+  downloadButton("MEB_Components", "Download MEB-Componenets Total"),
+
+  veriCikisi1 = tableOutput("veriCikisi1"),
+  veriCikisi2 = tableOutput("veriCikisi2")
+)
+
+
+server <- function(input, output) {
+
+   
+    
+  veri1 <- reactive({
+    req(input$dosyaYukleme1) 
+    dosya <- input$dosyaYukleme1
+    if (is.null(dosya))
+      return(NULL)
+    
+
+    veri <- read_xlsx(dosya$datapath)
+    return(veri)
+  })
+  
+ 
+  veri2 <- reactive({
+    req(input$dosyaYukleme2)
+    dosya <- input$dosyaYukleme2
+    if (is.null(dosya))
+      return(NULL)
+    
+
+    veri <- read_xlsx(dosya$datapath) 
+    return(veri)
+  })
+  
+   veri3 <- reactive({
+    req(input$dosyaYukleme3) 
+    dosya <- input$dosyaYukleme3
+    if (is.null(dosya))
+      return(NULL)
+    
+
+    veri <- read_xlsx(dosya$datapath) 
+    return(veri)
+  })
+  
+  observeEvent(input$islemButonu, {
+ 
+    inf <- veri1()
+    meb_last <- veri2()
+    meb_multi <- veri3()
+    
+inf_üst <- inf[1:4, ]
+
+inf_alt <- inf[251:252, ]
+
+inf1 <- rbind(inf_üst, inf_alt)
+
+inf2 <- inf1[-1, ]
+colnames(inf2) <- inf2[1, ]
+inf2 <- inf2[-1, ]
+
+yeni_isimler <- c("Yıl", "Ay", "Months")
+ilk_uc_sutun <- inf2[, 1:3]
+
+
+colnames(ilk_uc_sutun) <- yeni_isimler
+
+
+secilen_sutunlar <- c("01190", "01111", "01112", "01113", "01143", "01144", "01145", "01153", "01171", "01174", "01181", "01212", "04111", "04410", "04510", "04522", "05611", "06110", "06212", "07321", "08300", "09540", "12130")
+
+inf_fin <- inf2[, secilen_sutunlar]
+
+Tuik <- cbind(ilk_uc_sutun, inf_fin)
+Tuik <- Tuik[3:4, ]
+ay <- as.numeric(c(1,2))
+pirinç <- as.numeric(Tuik$"01111")
+bulgur <- as.numeric(Tuik$"01112")
+ekmek <- as.numeric(Tuik$"01113")
+yogurt <- as.numeric(Tuik$"01143")
+peynir <- as.numeric(Tuik$"01144")
+yumurta <- as.numeric(Tuik$"01145")
+yag <- as.numeric(Tuik$"01153")
+domates <- as.numeric(Tuik$"01171")
+salatalık <- as.numeric(Tuik$"01171")
+fasulye <- as.numeric(Tuik$"01174")
+şeker <- as.numeric(Tuik$"01181")
+tuz <- as.numeric(Tuik$"01190")
+çay <- as.numeric(Tuik$"01212")
+defter <- as.numeric(Tuik$"09540")
+kalem <- as.numeric(Tuik$"09540")
+kırtasiye <- as.numeric(Tuik$"09540")
+ilaç <- as.numeric(Tuik$"06110")
+doktor <- as.numeric(Tuik$"06212")
+kira <- as.numeric(Tuik$"04111")
+su <- as.numeric(Tuik$"04410")
+elektrik <- as.numeric(Tuik$"04510")
+gaz <- as.numeric(Tuik$"04522")
+çamasır_det <- as.numeric(Tuik$"05611")
+bulasık_det <- as.numeric(Tuik$"05611")
+dezenfektan <- as.numeric(Tuik$"05611")
+tıraş <- as.numeric(Tuik$"12130")
+agız_bakım <- as.numeric(Tuik$"12130")
+sabun <- as.numeric(Tuik$"12130")
+şampuan <- as.numeric(Tuik$"12130")
+tuvalet_kagıdı <- as.numeric(Tuik$"12130")
+bebek_bezi <- as.numeric(Tuik$"12130")
+hijyenik_ped <- as.numeric(Tuik$"12130")
+telefon <- as.numeric(Tuik$"08300")
+otobüs <- as.numeric(Tuik$"07321")
+
+meb <- cbind(ay, pirinç, bulgur, ekmek, yogurt, peynir, yumurta, yag, domates, salatalık, fasulye, şeker,tuz, çay, defter, kalem, kırtasiye, ilaç, doktor, kira, su, elektrik, gaz, çamasır_det, bulasık_det, dezenfektan, tıraş, agız_bakım, sabun, şampuan, tuvalet_kagıdı, bebek_bezi, hijyenik_ped, telefon,otobüs)
+meb_multiplier <- data.frame()
+
+for (i in 1:ncol(meb)) {
+  meb_multiplier["2", i] <- (meb[, i][2]) / meb[, i][1]
+}
+
+colnames(meb_multiplier) <- colnames(meb)
+colnames(meb_last) <- colnames(meb_multiplier)
+meb_cal <- meb_last*meb_multiplier
+colnames(meb_multi) <- colnames(meb_multiplier)
+meb_month <- as.numeric(meb_multi)*meb_cal
+
+t_meb_month <- t(meb_month)
+t_meb_month <- rownames_to_column(as.data.frame(t_meb_month), var = "Items")
+t_meb_month2 <- t_meb_month[2:35, ]
+meb_pc <- t_meb_month2$V1/5
+meb_total_pc <- cbind(t_meb_month2, as.data.frame(meb_pc))
+colnames(meb_total_pc) <- c("Items", "MEB Total", "MEB Per Capita")
+
+gıda <- c("pirinç", "bulgur", "ekmek", "yogurt", "peynir", "yumurta", "yag", "domates", "salatalık", "fasulye", "şeker","tuz", "çay")
+non_food <- c("çamasır_det", "bulasık_det", "dezenfektan", "tıraş", "agız_bakım", "sabun", "şampuan", "tuvalet_kagıdı", "bebek_bezi", "hijyenik_ped")
+edu <- c("defter", "kalem", "kırtasiye")
+hp <- c("ilaç", "doktor")
+transport <- c("otobüs")
+commun <- c("telefon")
+kira <- c("kira")
+fatura <- c("su", "elektrik", "gaz")
+
+FOOD <- meb_month[,gıda]
+NFI <- meb_month[, non_food]
+EDUCATION <- meb_month[, edu]
+HEALTH <- meb_month[, hp]
+Transportation <- meb_month[, transport]
+Communucation <- meb_month[, commun]
+rent <- meb_month[, kira]
+utilities <- meb_month[, fatura]
+
+t_rent <- t(rent)
+t_rent <- rownames_to_column(as.data.frame(t_rent), var = "Items")
+
+t_utilities <- t(utilities)
+t_utilities <- rownames_to_column(as.data.frame(t_utilities), var = "Items")
+
+t_food <- t(FOOD)
+t_food <- rownames_to_column(as.data.frame(t_food), var = "Items")
+
+t_nfi <- t(NFI)
+t_nfi <- rownames_to_column(as.data.frame(t_nfi), var = "Items")
+
+t_edu <- t(EDUCATION)
+t_edu <- rownames_to_column(as.data.frame(t_edu), var = "Items")
+
+t_health <- t(HEALTH)
+t_health <- rownames_to_column(as.data.frame(t_health), var = "Items")
+
+t_transpor <- t(Transportation)
+t_transpor <- rownames_to_column(as.data.frame(t_transpor), var = "Items")
+
+t_commun <- t(Communucation)
+t_commun <- rownames_to_column(as.data.frame(t_commun), var = "Items")
+
+
+total_food <- sum(t_food$V1)
+total_nfi <- sum(t_nfi$V1)
+total_edu <- sum(t_edu$V1)
+total_health <- sum(t_health$V1)
+total_transport <- sum(t_transpor$V1)
+total_communucation <- sum(t_commun$V1)
+total_rent <- sum(t_rent$V1)
+total_utilities <- sum(t_utilities$V1)
+total_meb <- sum(t_meb_month2$V1)
+
+total_exp <- data.frame(total_food,total_nfi,total_edu,total_health,total_transport,total_communucation,total_rent,total_utilities,total_meb)
+
+t_total_exp <- t(total_exp)
+t_total_exp <- rownames_to_column(as.data.frame(t_total_exp), var = "Items")
+
+
+write_xlsx(meb_total_pc, path = "MEB_Calculation.xlsx")
+write_xlsx(t_total_exp, path = "MEB_Componenets.xlsx")
+
+  })
+  
+  output$veriCikisi1 <- renderTable({
+    veri1()
+  })
+  
+  output$veriCikisi2 <- renderTable({
+    veri2()
+  })
+  output$MEB_by_Item <- downloadHandler(
+    filename = function() {
+      "MEB_Calculation.xlsx" 
+    },
+    content = function(file) {
+      
+      file.copy("MEB_Calculation.xlsx", file)
+    }
+  )
+    output$MEB_Components <- downloadHandler(
+    filename = function() {
+      "MEB_Componenets.xlsx" 
+    },
+    content = function(file) {
+      
+      file.copy("MEB_Componenets.xlsx", file)
+    }
+  )
+}
+
+
+shinyApp(ui, server)
+
+
+
+```
